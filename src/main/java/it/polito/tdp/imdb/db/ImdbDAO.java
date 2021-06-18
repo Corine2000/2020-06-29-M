@@ -6,7 +6,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
 import it.polito.tdp.imdb.model.Actor;
+import it.polito.tdp.imdb.model.Adiacenza;
 import it.polito.tdp.imdb.model.Director;
 import it.polito.tdp.imdb.model.Movie;
 
@@ -84,7 +87,78 @@ public class ImdbDAO {
 		}
 	}
 	
+	public void getVertici(Integer anno, Map<Integer, Director> idMap) {
+		String sql="SELECT d.* "
+				+ "FROM movies m, directors d, movies_directors md "
+				+ "WHERE m.id = md.movie_id AND d.id = md.director_id AND m.year=? "
+				+ "GROUP BY d.id "
+				+ "HAVING COUNT(m.id)>=1 ";
+		
+		Connection conn = DBConnect.getConnection();
+
+		try {
+			PreparedStatement st = conn.prepareStatement(sql);
+			st.setInt(1, anno);
+			ResultSet res = st.executeQuery();
+			
+			while (res.next()) {
+            
+				if(!idMap.containsKey(res.getInt("id"))) {
+				Director director = new Director(res.getInt("id"), res.getString("first_name"), res.getString("last_name"));
+				   idMap.put(res.getInt("id"), director);
+				}
+				
+				
+			}
+			conn.close();
+			
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+			
+		}
+		
+	}
 	
+	public List<Adiacenza> getArchi(Map<Integer, Director> idMap, int anno){
+		List<Adiacenza> result = new ArrayList<>();
+		String sql="SELECT md1.director_id AS d1, md2.director_id AS d2, COUNT(DISTINCT r1.actor_id) AS peso "
+				+ "FROM movies_directors md1,  movies m1, roles r1,  movies_directors md2, roles r2, movies m2 "
+				+ "WHERE md1.director_id<md2.director_id  "
+				+ "      AND md1.movie_id=m1.id AND m1.id= r1.movie_id "
+				+ "      AND  md2.movie_id= m2.id AND m2.id= r2.movie_id "
+				+ "      AND r1.actor_id = r2.actor_id  "
+				+ "      AND m1.year = m2.year AND m1.year=? "
+				+ "GROUP BY md1.director_id,  md2.director_id  "
+				+ "HAVING COUNT(DISTINCT r1.actor_id)>0 ";
+		Connection conn = DBConnect.getConnection();
+
+		try {
+			PreparedStatement st = conn.prepareStatement(sql);
+			st.setInt(1, anno);
+			ResultSet res = st.executeQuery();
+			
+			while (res.next()) {
+           
+				Director director1 = idMap.get(res.getInt("d1"));
+				Director director2 = idMap.get(res.getInt("d2"));
+				
+				if(director1!=null && director2!=null) {
+					Adiacenza adj = new Adiacenza(director1, director2, res.getDouble("peso"));
+					result.add(adj);
+				}
+				
+				
+			}
+			conn.close();
+			return result;
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return null;
+		}
+		
+	}
 	
 	
 	
